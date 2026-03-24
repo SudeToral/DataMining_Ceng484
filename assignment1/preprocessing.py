@@ -1,3 +1,9 @@
+# Handles everything before the classifiers touch the data.
+# Zeros in medical columns like Glucose or BMI aren't real zeros — they're missing values.
+# We replace them with class-specific medians so diabetic and non-diabetic groups
+# get their own reference, which is more accurate than a single global median.
+# Also adds two binary features from EDA that turned out to improve accuracy.
+
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -15,19 +21,67 @@ FEATURE_COLS = [
 
 def load_data(path: str = "diabetes.csv") -> pd.DataFrame:
     """Load the raw CSV and return a DataFrame."""
-    df = pd.read_csv(path)
-    print(f"[load]  shape={df.shape}")
-    return df
+    return pd.read_csv(path)
 
 
 def explore(df: pd.DataFrame) -> None:
-    """Print a quick overview of the dataset."""
-    print(df.dtypes)
-    print(df.head())
-    print(df.describe().round(2))
-    print("\nZero counts in medically invalid columns:")
+    """Print dataset overview, class distribution, per-feature stats, and correlations."""
+    W = 65
+    features = [c for c in df.columns if c != "Outcome"]
+
+    # Class distribution
+    diabetic   = int((df["Outcome"] == 1).sum())
+    non_diab   = int((df["Outcome"] == 0).sum())
+    print("\n" + "=" * W)
+    print("CLASS DISTRIBUTION")
+    print("=" * W)
+    print(f"  Tested Positive (Diabetic): {diabetic}")
+    print(f"  Tested Negative (Healthy) : {non_diab}")
+    print(f"  Total records             : {len(df)}")
+
+    # Dataset info
+    print("\n" + "=" * W)
+    print("DATASET INFO")
+    print("=" * W)
+    df.info()
+
+    # Per-feature stats by class
+    diab    = df[df["Outcome"] == 1]
+    nondiab = df[df["Outcome"] == 0]
+    print("\n" + "=" * W)
+    print("TABLE 2 — Per-Feature Statistics by Class")
+    print("=" * W)
+    hdr = (f"{'Feature':<28} {'Mean(D)':>10} {'Mean(ND)':>10}"
+           f" {'Std(D)':>10} {'Std(ND)':>10} {'Min':>8} {'Max':>8}")
+    print(hdr)
+    print("-" * len(hdr))
+    for feat in features:
+        print(
+            f"{feat:<28}"
+            f" {diab[feat].mean():>10.2f}"
+            f" {nondiab[feat].mean():>10.2f}"
+            f" {diab[feat].std():>10.2f}"
+            f" {nondiab[feat].std():>10.2f}"
+            f" {df[feat].min():>8.2f}"
+            f" {df[feat].max():>8.2f}"
+        )
+
+    # Zero-value analysis
+    print("\n" + "=" * W)
+    print("Missing Value Analysis (Biologically Invalid Zeros)")
+    print("=" * W)
     for col in ZERO_COLS:
-        print(f"  {col:25s}: {(df[col] == 0).sum()} zeros")
+        cnt = int((df[col] == 0).sum())
+        pct = cnt / len(df) * 100
+        print(f"  {col:<25} zeros={cnt:>3}  ({pct:5.1f}%)")
+
+    # Correlation with Outcome
+    print("\n" + "=" * W)
+    print("Feature Correlations with Outcome (absolute)")
+    print("=" * W)
+    corr = df.corr(numeric_only=True)["Outcome"].drop("Outcome").abs().sort_values(ascending=False)
+    for feat, val in corr.items():
+        print(f"  {feat:<28} {val:.6f}")
 
 
 def impute_zeros(df: pd.DataFrame) -> pd.DataFrame:
@@ -38,15 +92,14 @@ def impute_zeros(df: pd.DataFrame) -> pd.DataFrame:
     """
     df = df.copy()
     for col in ZERO_COLS:
-        for outcome_val, label in [(0, "non-diabetic"), (1, "diabetic")]:
+        for outcome_val in [0, 1]:
             mask_zero    = (df[col] == 0) & (df["Outcome"] == outcome_val)
             mask_nonzero = (df[col] != 0) & (df["Outcome"] == outcome_val)
             median_val   = df.loc[mask_nonzero, col].median()
             df.loc[mask_zero, col] = df[col].dtype.type(median_val)
-            print(f"  [impute] {col} | {label:12s} → {mask_zero.sum():>2d} zeros → median {median_val:.2f}")
     return df
 
-
+# Lightweight feature engineering based on EDA insights
 def add_eda_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     Add 2 binary features extracted via EDA (as described in the paper):
@@ -69,8 +122,7 @@ def split(df: pd.DataFrame, test_size: float = 0.30, random_state: int = 42):
     X = df[FEATURE_COLS]
     y = df["Outcome"]
 
-    # stratify=y preserves the class ratio in both splits (paper's test set:
-    # 150 non-diabetic, 81 diabetic — exactly what stratified 30 % gives)
+    # stratify=y preserves the class ratio in both splits 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size, random_state=random_state, stratify=y
     )

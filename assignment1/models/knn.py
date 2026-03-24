@@ -1,3 +1,7 @@
+# KNN is sensitive to the choice of k, so we use GridSearch with 5-fold CV
+# to pick the best k from [3, 5, 7, 9, 11] rather than hardcoding it.
+# Needs scaled input since it's distance-based.
+
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import GridSearchCV
 

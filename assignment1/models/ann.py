@@ -1,3 +1,7 @@
+# MLP matching the paper's description: two hidden layers (100, 50), ReLU, Adam.
+# The paper only says "3-layer ANN" without specifying neuron counts,
+# so (100, 50) is our best approximation based on common practice.
+
 from sklearn.neural_network import MLPClassifier
 
 NAME = "ANN"

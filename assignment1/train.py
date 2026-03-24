@@ -1,3 +1,8 @@
+# Main entry point. Loads data, runs preprocessing, then trains all five
+# classifiers across three feature scenarios (Tables 3, 4, 5 from the paper).
+# Results are printed side by side with the paper's reported values.
+# Confusion matrices are only saved for Table 3 to keep output manageable.
+
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -6,7 +11,6 @@ from sklearn.preprocessing import StandardScaler
 import preprocessing as pp
 import utils
 import models
-from models import ann_keras
 
 
 PAPER = {
@@ -49,8 +53,7 @@ def run_scenario(X_train, X_test, y_train, y_test,
     trained_models = {}
 
     for mod, display_name, prefix in CLASSIFIER_CONFIGS:
-        print(f"\n{display_name}")
-
+        print(f"    Training {display_name}...", end=" ", flush=True)
         clf = mod.build()
         if mod.USES_SCALED:
             clf.fit(X_train_sc, y_train)
@@ -60,9 +63,10 @@ def run_scenario(X_train, X_test, y_train, y_test,
             y_pred = clf.predict(X_test)
 
         if hasattr(clf, "best_params_"):
-            print(f"  best params: {clf.best_params_}")
+            print(f"(best k={clf.best_params_['n_neighbors']})", end=" ")
 
-        results[mod.NAME]        = utils.evaluate(display_name, y_test, y_pred)
+        results[mod.NAME]        = utils.evaluate(y_test, y_pred)
+        print(f"-> Accuracy: {results[mod.NAME]['Accuracy']*100:.2f}%")
         trained_models[mod.NAME] = (clf, y_pred)
 
         if save_cm:
@@ -75,14 +79,25 @@ def run_scenario(X_train, X_test, y_train, y_test,
     return results, trained_models
 
 
-print("=" * 60)
-print("DATA PREPARATION")
-print("=" * 60)
+print("=" * 75)
+print("DIABETES PREDICTION — REPRODUCING PAPER RESULTS")
+print("=" * 75)
 
-df_raw   = pp.load_data("diabetes.csv")
+print("\n[1/4] Loading and exploring dataset...")
+df_raw = pp.load_data("diabetes.csv")
 pp.explore(df_raw)
+
+print("\n[2/4] Preprocessing...")
+print("      Replacing biologically impossible zero values with class-conditional medians...")
 df_clean = pp.impute_zeros(df_raw)
+print("\n" + "=" * 65)
+print("PREPROCESSING — Zero Imputation Complete")
+print("=" * 65)
+print("      Remaining NaN values after imputation:")
+print(df_clean.isna().sum().to_string())
+print("      Engineering 2 additional features (High_BP_Glucose, High_BP)...")
 df_eda   = pp.add_eda_features(df_clean)
+print("      Feature engineering complete.")
 
 y = df_eda["Outcome"]
 
@@ -106,93 +121,42 @@ SCENARIOS = {
 
 all_results = {}
 
+print("\n[3/4] Training and evaluating classifiers across 3 feature scenarios...")
+
 for table_prefix, cfg in SCENARIOS.items():
-    print("\n" + "=" * 60)
-    print(cfg["label"].upper())
-    print(f"Features: {cfg['features']}")
-    print("=" * 60)
+    print(f"\n  Scenario: {cfg['label']}")
+    print(f"  Features ({len(cfg['features'])}): {', '.join(cfg['features'])}")
 
     X = df_eda[cfg["features"]]
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.30, random_state=42, stratify=y
     )
+    print(f"  Train/test split (70/30, stratified): {X_train.shape[0]} train / {X_test.shape[0]} test samples")
+
+    print("  Applying StandardScaler to distance/gradient-based models (KNN, SVM, ANN)...")
     scaler     = StandardScaler()
     X_train_sc = scaler.fit_transform(X_train)
     X_test_sc  = scaler.transform(X_test)
 
-    print(f"[split] train={X_train.shape}  test={X_test.shape}")
-
+    print("  Running classifiers (KNN uses 5-fold GridSearch for k):")
     results, trained_models = run_scenario(
         X_train, X_test, y_train, y_test,
         X_train_sc, X_test_sc,
         cfg["features"], table_prefix,
+        save_cm=(table_prefix == "table3"),
     )
     all_results[table_prefix] = results
 
-    utils.plot_comparison(
-        results,
-        filename=f"{table_prefix}_comparison_chart.png",
-        title=f"Classifier Comparison — {cfg['label']}",
-    )
-
     utils.print_benchmark(results, PAPER[table_prefix], title=cfg["label"])
 
-    if table_prefix == "table3":
-        rf_clf, _ = trained_models["RF"]
-        if rf_clf is not None:
-            utils.plot_feature_importance(
-                rf_clf, cfg["features"], filename="feature_importance.png"
-            )
-
-print("\n" + "=" * 60)
-print("ALL SCENARIOS COMPLETE")
-print("=" * 60)
-
-print("\n" + "=" * 60)
-print("ANN COMPARISON: sklearn (paper) vs Keras (enhancement)")
-print("Feature set: Table 3  (8 original + 2 EDA features)")
-print("=" * 60)
-
-X_t3 = df_eda[SCENARIOS["table3"]["features"]]
-X_tr, X_te, y_tr, y_te = train_test_split(
-    X_t3, y, test_size=0.30, random_state=42, stratify=y
+print("\n[4/4] Generating accuracy comparison chart (Table 3 vs Table 4)...")
+utils.plot_accuracy_comparison(
+    all_results["table3"],
+    all_results["table4"],
+    filename="figure8_accuracy_comparison.png",
 )
-sc       = StandardScaler()
-X_tr_sc  = sc.fit_transform(X_tr)
-X_te_sc  = sc.transform(X_te)
+print("      Saved → figure8_accuracy_comparison.png")
+print("\nAll scenarios complete.")
+print("=" * 75)
 
-print("\n--- sklearn MLPClassifier (paper reproduction) ---")
-sk_ann = models.ann.build()
-sk_ann.fit(X_tr_sc, y_tr)
-y_sk   = sk_ann.predict(X_te_sc)
-res_sk = utils.evaluate("ANN (sklearn)", y_te, y_sk)
-utils.plot_confusion_matrix(
-    y_te, y_sk,
-    title    = "ANN sklearn — Confusion Matrix",
-    filename = "ann_sklearn_confusion_matrix.png",
-)
-
-print("\n--- Keras ANN (Dropout + class_weight enhancement) ---")
-y_ke   = ann_keras.fit_predict(X_tr_sc, y_tr.values, X_te_sc)
-res_ke = utils.evaluate("ANN (Keras)", y_te, y_ke)
-utils.plot_confusion_matrix(
-    y_te, y_ke,
-    title    = "ANN Keras — Confusion Matrix",
-    filename = "ann_keras_confusion_matrix.png",
-)
-
-utils.plot_comparison(
-    {"sklearn": res_sk, "Keras": res_ke},
-    filename = "ann_sklearn_vs_keras.png",
-    title    = "ANN: sklearn (paper) vs Keras (enhancement)",
-)
-
-print("\nANN Comparison Summary:")
-header = f"{'Version':<20} {'Accuracy':>10} {'Precision':>10} {'Recall':>10} {'F1':>10}"
-print(header)
-for label, res in [("sklearn (paper)", res_sk), ("Keras (enhanced)", res_ke)]:
-    print(f"{label:<20} {res['Accuracy']*100:>9.2f}%"
-          f" {res['Precision']*100:>9.2f}%"
-          f" {res['Recall']*100:>9.2f}%"
-          f" {res['F1-Score']*100:>9.2f}%")

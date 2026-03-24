@@ -1,3 +1,6 @@
+# Random Forest — best performer across all three feature scenarios.
+# Tree-based so no scaling needed. 200 trees for stable predictions.
+
 from sklearn.ensemble import RandomForestClassifier
 
 NAME = "RF"

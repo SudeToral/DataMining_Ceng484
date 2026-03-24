@@ -1,3 +1,6 @@
+# SVM with RBF kernel. Needs scaled input since it's margin-based.
+# The paper didn't report C or gamma, so we go with sklearn defaults.
+
 from sklearn.svm import SVC
 
 NAME = "SVM"
