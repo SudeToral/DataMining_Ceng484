@@ -6,7 +6,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import GridSearchCV
 
 NAME = "KNN"
-USES_SCALED = True   # KNN is distance-based → needs MinMaxScaler
+USES_SCALED = True   # KNN is distance-based → needs StandardScaler
 
 
 def build() -> GridSearchCV:

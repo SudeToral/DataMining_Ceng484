@@ -45,7 +45,7 @@ def plot_accuracy_comparison(results_with: dict, results_without: dict,
     matching Figure 8 style from the paper.
     """
     clf_keys    = ["KNN", "RF",  "SVM", "ANN", "DT"]
-    x_labels    = ["KNN", "RF",  "SVM", "ANN", "DS"]
+    x_labels    = ["KNN", "RF",  "SVM", "ANN", "DT"]
 
     acc_with    = [results_with[k]["Accuracy"]    for k in clf_keys]
     acc_without = [results_without[k]["Accuracy"] for k in clf_keys]

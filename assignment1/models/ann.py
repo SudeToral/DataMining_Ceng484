@@ -11,8 +11,8 @@ USES_SCALED = True   # gradient-based → needs MinMaxScaler
 def build(random_state: int = 42) -> MLPClassifier:
     """
     Paper describes a 3-layer ANN (input → hidden → output).
-    Single hidden layer of 100 neurons with ReLU, Adam optimiser,
-    early stopping to prevent overfitting, max 1000 iterations.
+    Two hidden layers (100, 50) with ReLU activation and Adam optimiser.
+    max_iter=1000 to ensure convergence.
     """
     return MLPClassifier(
         hidden_layer_sizes=(100, 50),   # input → 100 → 50 → output
