@@ -38,26 +38,30 @@ def plot_confusion_matrix(y_true, y_pred, title: str, filename: str) -> None:
     plt.close()
 
 
-def plot_accuracy_comparison(results_with: dict, results_without: dict,
+def plot_accuracy_comparison(results_a: dict, results_b: dict, results_c: dict,
                              filename: str = "figure8_accuracy_comparison.png") -> None:
     """
-    Grouped bar chart: accuracy WITH vs WITHOUT the 2 EDA features,
+    Grouped bar chart: accuracy for Config A (8+2 EDA features),
+    Config B (8 original features), and Config C (6 features),
     matching Figure 8 style from the paper.
     """
-    clf_keys    = ["KNN", "RF",  "SVM", "ANN", "DT"]
-    x_labels    = ["KNN", "RF",  "SVM", "ANN", "DT"]
+    clf_keys = ["KNN", "RF", "SVM", "ANN", "DT"]
+    x_labels = ["KNN", "RF", "SVM", "ANN", "DT"]
 
-    acc_with    = [results_with[k]["Accuracy"]    for k in clf_keys]
-    acc_without = [results_without[k]["Accuracy"] for k in clf_keys]
+    acc_a = [results_a[k]["Accuracy"] for k in clf_keys]
+    acc_b = [results_b[k]["Accuracy"] for k in clf_keys]
+    acc_c = [results_c[k]["Accuracy"] for k in clf_keys]
 
     x     = np.arange(len(x_labels))
-    width = 0.35
+    width = 0.25
 
-    fig, ax = plt.subplots(figsize=(10, 6))
-    bars1 = ax.bar(x - width / 2, acc_with,    width, color="#4472C4",
-                   label="Accuracy with using two new extracted feature")
-    bars2 = ax.bar(x + width / 2, acc_without, width, color="#9E3B2E",
-                   label="Accuracy without using two new extracted feature")
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.bar(x - width, acc_a, width, color="#4472C4",
+           label="Config A — 8 original + 2 EDA features")
+    ax.bar(x,         acc_b, width, color="#9E3B2E",
+           label="Config B — 8 original features only")
+    ax.bar(x + width, acc_c, width, color="#70AD47",
+           label="Config C — 6 features (no SkinThickness, PedigreeFunc, EDA)")
 
     ax.set_ylim(0, 1.0)
     ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])

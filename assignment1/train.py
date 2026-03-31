@@ -150,10 +150,11 @@ for table_prefix, cfg in SCENARIOS.items():
 
     utils.print_benchmark(results, PAPER[table_prefix], title=cfg["label"])
 
-print("\n[4/4] Generating accuracy comparison chart (Table 3 vs Table 4)...")
+print("\n[4/4] Generating accuracy comparison chart (Config A vs B vs C)...")
 utils.plot_accuracy_comparison(
     all_results["table3"],
     all_results["table4"],
+    all_results["table5"],
     filename="figure8_accuracy_comparison.png",
 )
 print("      Saved → figure8_accuracy_comparison.png")
